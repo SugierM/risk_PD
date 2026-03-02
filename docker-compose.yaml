@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant_db
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+
+  rag-service:
+    build:
+      context: ./RAG
+      dockerfile: Dockerfile
+    container_name: rag-service
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    volumes:
+      - ./RAG:/app
+      - ./RAG/embedding_cache:/app/embedding_cache
+      - ./RAG/docs:/app/docs
+    depends_on:
+      - qdrant
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+#   risk-prediction:
+#     build:
+#       context: ./risk_pred
+#       dockerfile: Dockerfile
+#     container_name: risk_prediction
+#     ports:
+#       - "8000:8000"
+#     env_file:
+#       - .env
+#     volumes:
+#       - ./risk_pred:/app # Not sure what will be there for now
+#     deploy:
+#       resources:
+#         reservations:
+#           devices:
+#             - driver: nvidia
+#               count: 1
+#               capabilities: [gpu]
+
+
+
+volumes:
+  qdrant_data:
+  hf_cache:
