@@ -99,7 +99,7 @@ Currently undergoing refactoring for better consolidation (ETA: 1-2 days).
 
 - **`models/`** – Directory where trained model objects (`.pth` and `.joblib`) are saved, ready for inference on new data.
 
-- **`reports/`** – Automatically generated reports, visualizations (e.g., ROC curve, probability distribution), and evaluation tables.
+- **`reports/`** – Automatically generated reports, visualizations (e.g., ROC curve, probability distribution), and evaluation tables. (!NICE TO HAVE!)
 
 ---
 
