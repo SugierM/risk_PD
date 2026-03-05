@@ -85,8 +85,7 @@ The project uses the publicly available **LendingClub** dataset (available, amon
 
 ## Repository Structure
 
-The project is divided into logical modules to separate exploratory analysis from execution:
-Currently undergoing refactoring for better consolidation (ETA: 1-2 days).
+Each element in this project is divided into logical modules to separate exploratory analysis from execution:
 
 - **`data/`** – Folder intended for datasets.  
   *(Note: Datasets are not tracked in the repository due to size. Download instructions are provided below.)*
