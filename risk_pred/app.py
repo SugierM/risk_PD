@@ -4,10 +4,10 @@ from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 import joblib
-from model_grade import FlexibleScoringNet
+from src.model_grade import FlexibleScoringNet
 import torch
 import pandas as pd
-from utils import MAPPED_BINS, MAPPED_FILLS, prepare_for_pd
+from src.utils import MAPPED_BINS, MAPPED_FILLS, prepare_for_pd
 
 
 DEFAULT_GRADE = 0.454
