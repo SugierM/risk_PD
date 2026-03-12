@@ -13,7 +13,10 @@ The solution covers the full modeling lifecycle, including:
 - variable selection and transformation (e.g., WoE/IV),
 - model training and validation,
 - performance evaluation (AUC, Gini),
-- and interpretation of results (!WORK IN PROGRESS!).
+- and interpretation of results (for rejected inquiries).
+
+Still missing:
+- threshold analysis
 
 The model was developed for educational and portfolio purposes using historical LendingClub data, with a focus on real-world credit risk practices.
 
@@ -41,7 +44,7 @@ The system is designed to:
   - *"Are demographic variables restricted?"*
 
 
-### Current Status
+### Current RAG System Status
 
 This module is **currently under development**.
 

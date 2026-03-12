@@ -29,6 +29,46 @@ MAPPED_FILLS = {
 }
 
 
+LOAN_DESCRIPTIONS_PL = {
+    "loan_amnt": "Wnioskowana kwota pożyczki",
+    "term": "Okres spłaty pożyczki (36 lub 60 miesięcy)",
+    "installment": "Wysokość miesięcznej raty",
+    "emp_title": "Tytuł zawodowy podany przez pożyczkobiorcę",
+    "emp_length": "Staż pracy (w latach)",
+    "home_ownership": "Status własności mieszkania/domu",
+    "annual_inc": "Deklarowany roczny dochód brutto pożyczkobiorcy",
+    "loan_status": "Aktualny status pożyczki (np. w całości spłacona, w trakcie spłaty, zaległość, umorzona)",
+    "purpose": "Cel pożyczki zadeklarowany przez pożyczkobiorcę",
+    "dti": "Wskaźnik zadłużenia do dochodu wyrażona w % (miesięczne zobowiązania podzielone przez miesięczny dochód, z wyłączeniem wnioskowanej pożyczki)",
+    "delinq_2yrs": "Liczba przypadków opóźnień w płatnościach powyżej 30 dni w ciągu ostatnich 2 lat",
+    "earliest_cr_line": "Data otwarcia pierwszej linii kredytowej pożyczkobiorcy wyrażona w miesiącach",
+    "inq_last_6mths": "Liczba zapytań kredytowych w ciągu ostatnich 6 miesięcy",
+    "mths_since_last_delinq": "Liczba miesięcy od ostatniego opóźnienia w płatnościach",
+    "open_acc": "Liczba otwartych rachunków kredytowych",
+    "pub_rec": "Liczba negatywnych wpisów w rejestrach publicznych (np. upadłości, wyroki sądowe)",
+    "revol_bal": "Łączne saldo na odnawialnych liniach kredytowych",
+    "revol_util": "Wskaźnik wykorzystania kredytu odnawialnego wyrażony w %",
+    "total_acc": "Łączna liczba linii kredytowych (otwartych i zamkniętych)",
+    "initial_list_status": "Status pierwotnego wystawienia pożyczki na platformie (W – Całość / F – Ułamkowa)",
+    "application_type": "Typ wniosku (brane pod uwagę tylko 'Indywidualny', więc nie powinno się nigdzie pojawić)",
+    "acc_now_delinq": "Liczba rachunków obecnie zalegających ze spłatą",
+    "tot_coll_amt": "Łączna kwota w historii objęta windykacją",
+    "tot_cur_bal": "Łączne aktualne saldo wszystkich rachunków kredytowych",
+    "total_rev_hi_lim": "Łączny limit kredytów odnawialnych",
+    "inq_fi": "Liczba zapytań o kredyt w instytucjach finansowych",
+    "inq_last_12m": "Łączna liczba zapytań kredytowych w ciągu ostatnich 12 miesięcy",
+    "avg_cur_bal": "Średnie saldo na aktywnych rachunkach",
+    "bc_util": "Wskaźnik wykorzystania limitu na kartach bankowych wyrażony w %",
+    "chargeoff_within_12_mths": "Liczba odpisów (umorzeń z powodu nieściągalności) w ciągu ostatnich 12 miesięcy",
+    "mo_sin_old_rev_tl_op": "Liczba miesięcy od otwarcia najstarszego konta odnawialnego",
+    "mort_acc": "Liczba rachunków hipotecznych",
+    "num_actv_bc_tl": "Liczba obecnie aktywnych rachunków kart kredytowych",
+    "num_tl_90g_dpd_24m": "Liczba rachunków z opóźnieniem płatności o 90+ dni w ciągu ostatnich 24 miesięcy",
+    "num_tl_op_past_12m": "Liczba rachunków otwartych w ciągu ostatnich 12 miesięcy",
+    "pct_tl_nvr_dlq": "Procent linii kredytowych, które nigdy nie miały opóźnień w spłacie",
+}
+
+
 MAPPED_BINS = {
     "loan_amnt": {
         "bins": [-np.inf, 7000.0, 10500.0, 15000.0, 21000.0, np.inf],
@@ -140,6 +180,20 @@ WOE_MAPS = {'loan_amnt': {'0-7k': -0.3096895566140675,
  'home_ownership': {'MORTGAGE': -0.15704912558200876,
   'OWN_OTHER': 0.029727634071044905,
   'RENT': 0.17035630554360756}}
+
+
+BASE_VALUES = {'loan_amnt': '0-7k',
+ 'bc_util': '0-33.8',
+ 'revol_util':'0-25.8',
+ 'mo_sin_old_rev_tl_op':'0-96',
+ 'num_tl_op_past_12m':'0-1',
+ 'dti':'0-8.5',
+ 'annual_inc':'0-40k',
+ 'tot_cur_bal':'0-225k',
+ 'inq_last_6mths':'0',
+ 'probability':'0-0.341',
+ 'home_ownership':'MORTGAGE',
+ 'total_rev_hi_lim': '0-9.2k'}
 
 
 def prepare_df(df, feature_order):
@@ -266,7 +320,6 @@ def preprocess_data(df, feature_order=None, revol_99=None, avg_cur_99=None):
     return df.fillna(0)
 
 
-
 def prepare_for_pd(df_raw, assets):
     df = df_raw.copy()
     mapped_bins = assets["mapped_bins"]
@@ -350,8 +403,35 @@ def apply_woe_transformation(df, mapped_bins, woe_maps):
     return df_new
 
 
-
 def home_owner(val):
     if val in ["RENT", "MORTGAGE"]:
         return val
     return "OWN_OTHER"
+
+
+def provide_inter(data: pd.DataFrame, assets, org_values, top_n):
+    coef = assets["coefficients"]
+    contributions = []
+    for feature, woe_value in data.items():
+        clean_feature = feature.replace('_bins', '')
+        
+        if clean_feature in ['Intercept', 'probability']: # Just not to include grade, as in this project it gives no info of "WHY?"
+            continue
+            
+        if clean_feature in coef:
+            beta = coef[clean_feature]
+
+            impact = float(beta * woe_value)
+
+            client_category = org_values[clean_feature]
+            
+            contributions.append({
+                'feature': LOAN_DESCRIPTIONS_PL[clean_feature],
+                'base_cat': BASE_VALUES[clean_feature],
+                'client_cat': client_category,
+                'value': woe_value,
+                'impact': round(impact, 2)
+            })
+
+    sorted_reasons = sorted(contributions, key=lambda x: x['impact'], reverse=True)
+    return sorted_reasons[:top_n]

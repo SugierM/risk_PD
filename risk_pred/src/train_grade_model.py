@@ -157,10 +157,10 @@ def train_grade_model():
     ]
 
     report_text = "\n".join(report_lines)
-    with open(REPORT_PATH, "a", encoding="utf-8") as f:
+    with open(REPORT_PATH, "w", encoding="utf-8") as f:
         f.write(report_text)
 
-    print(f"Raport został zapisany w: {REPORT_PATH}")
+    print(f"Report saved at: {REPORT_PATH}")
 
 
 

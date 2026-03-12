@@ -7,20 +7,26 @@ import joblib
 from src.model_grade import FlexibleScoringNet
 import torch
 import pandas as pd
-from src.utils import MAPPED_BINS, MAPPED_FILLS, prepare_for_pd
+from src.utils import MAPPED_BINS, MAPPED_FILLS, prepare_for_pd, provide_inter
+from pathlib import Path
 
+import warnings
+warnings.filterwarnings("ignore")
+
+GRADE_MODEL_DIR = Path.cwd() / "models" / "grade_models"
+PD_MODEL_DIR = Path.cwd() / "models" / "pd"
 
 DEFAULT_GRADE = 0.454
 
 PD_FIELDS = [
     {"name": "annual_inc", "label": "Dochód roczny", "type": "number", "required": True},
     {"name": "loan_amnt", "label": "Kwota pożyczki", "type": "number", "required": True},
-    {"name": "dti", "label": "Zadłużenie do dochodu", "type": "number", "step": "0.1", "required": True}, # wierd to ask it here, but stays for now
+    {"name": "dti", "label": "Zadłużenie do dochodu (%)", "type": "number", "step": "0.1", "required": True}, # wierd to ask it here, but stays for now
     {"name": "inq_last_6mths", "label": "Zapytania (w ciągu ostatnich 6 miesięcy)", "type": "number", "required": True},
     {"name": "total_rev_hi_lim", "label": "Limit na rachunkach odnawialnych", "type": "number", "required": True},
-    {"name": "revol_util", "label": "Wykorzystanie limitów na rachunkach odnawialnych", "type": "number", "required": True},
+    {"name": "revol_util", "label": "Wykorzystanie limitów na rachunkach odnawialnych (%)", "type": "number", "required": True},
     {"name": "tot_cur_bal", "label": "Całkowite zadłużenie", "type": "number", "required": True},
-    {"name": "bc_util", "label": "Wykorzystany limit na kartach kredytowych", "type": "number", "required": True},
+    {"name": "bc_util", "label": "Wykorzystany limit na kartach kredytowych (%)", "type": "number", "required": True},
     {"name": "num_tl_op_past_12m", "label": "Liczba otwartych lini kredytowych w ostatnich 12m", "type": "number", "required": True},
     {"name": "mo_sin_old_rev_tl_op", "label": "Liczba miesięcy, od otwarcia najstarszego rachunku odnawialnego", "type": "number", "required": True},
 
@@ -40,9 +46,9 @@ def load_all_assets():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model_pd_dict = joblib.load(
-        "models/logistic_regression_woe_v1.joblib"
+        PD_MODEL_DIR / "logistic_regression_woe_v1.joblib"
     )
-    model_grade_dict = joblib.load("models/metadata.joblib")
+    model_grade_dict = joblib.load(GRADE_MODEL_DIR / "metadata.joblib")
 
     nn_scaler = model_grade_dict["scaler"]
 
@@ -55,9 +61,9 @@ def load_all_assets():
         )
 
     grade_input_dim = len(grade_order)
-    best_arch_layers = [128, 64, 32]
+    best_arch_layers = (32,)
     best_model_path = (
-        "models/best_model_Arch_128-64-32_LR_0.0005.pth"
+        GRADE_MODEL_DIR / "grade_model_32_final.pth"
     )
 
     model_grade = FlexibleScoringNet(
@@ -78,6 +84,7 @@ def load_all_assets():
         "pd_order": list(pd_order),
         "model_grade": model_grade,
         "grade_order": list(grade_order),
+        "coefficients": model_pd_dict["coefficients"]
     }
 
 
@@ -103,13 +110,13 @@ async def index(request: Request):
 async def predict(request: Request):
     form_data = await request.form()
     input_dict = dict(form_data)
+    message = ""
 
     df_all = pd.DataFrame([input_dict])
     df_all = df_all.apply(pd.to_numeric, errors='ignore')
     assets = request.app.state.assets
 
     grade = DEFAULT_GRADE
-    print(f"check: {all(input_dict.values())}")
     if all(input_dict.values()):
         df_grade = df_all[assets["grade_order"]]
         grade = DEFAULT_GRADE # FOR NOW
@@ -119,12 +126,20 @@ async def predict(request: Request):
     df_pd = prepare_for_pd(df_all, assets)
     verd = assets["model_pd"].predict_proba(df_pd)[:, 1][0]
     
+    if verd > 0.5:
+        interpret = provide_inter(df_pd, assets, input_dict, 3)
+        message = "Najważniejsze powody udrzucenia:<br>"
+        for p in interpret:
+            message += f"<b>{p["feature"]}</b> - {p["impact"]}<br>"
+            message += f"<b>Kategoria bazowa</b>: {p["base_cat"]}<br>"
+            message += f"<b>Wartośc podana przez klienta</b>: {p["client_cat"]}<br>"
+        
 
     result = {
-        "decision": verd > 0.5,
+        "decision": "Odmowa" if verd > 0.5 else "Zgoda",
         "probability": verd,
+        "inter": message
     }
-
 
     return templates.TemplateResponse("form.html", {
         "request": request, 
@@ -132,6 +147,7 @@ async def predict(request: Request):
         "grade_fields": GRADE_FIELDS,
         "result": result
     })
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)

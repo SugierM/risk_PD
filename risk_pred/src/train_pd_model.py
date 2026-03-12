@@ -87,11 +87,12 @@ print("_" * 55)
 print(f"C = 1 | Test AUC = {best_auc:.4f}")
 
 coefficients = pd.DataFrame({
-'Feature': ['Intercept'] + list(X_train.columns),
+'Feature': ['Intercept'] + [ col.replace("_bins", "") for col in list(X_train.columns)],
 'Coeff': [best_model.intercept_[0]] + list(best_model.coef_[0])
 })
 
 print(coefficients)
+coef = dict(zip(coefficients['Feature'], coefficients['Coeff']))
 
 model_artifacts = {
     "model": best_model,
@@ -99,6 +100,7 @@ model_artifacts = {
     "mapped_bins": MAPPED_BINS,
     "woe_maps": WOE_MAPS,
     "mapped_fills": MAPPED_FILLS,
+    "coefficients": coef,
 }
 
 joblib.dump(
